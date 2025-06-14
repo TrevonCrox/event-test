@@ -46,56 +46,68 @@
   </div>
   <button id="downloadBtn">Download Your Poster</button>
 
-  <script>
-    const upload = document.getElementById("upload");
-    const canvas = document.getElementById("canvas");
-    const ctx = canvas.getContext("2d");
-    const downloadBtn = document.getElementById("downloadBtn");
+ <script>
+  const upload = document.getElementById("upload");
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+  const downloadBtn = document.getElementById("downloadBtn");
 
-    const frameImage = new Image();
-    frameImage.src = "poster_frame.png"; // Your designed poster with transparent circular area
+  const frameImage = new Image();
+  frameImage.src = "poster_frame.png"; // Your full-size poster with transparent circle
 
-    upload.addEventListener("change", function (e) {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
+  // Position of the circular frame center (adjust to match your design)
+  const circleX = 540;  // X-center of circle
+  const circleY = 540;  // Y-center of circle
+  const circleRadius = 250; // Radius of circular frame
 
-      reader.onload = function (event) {
-        const userImage = new Image();
-        userImage.onload = function () {
-          // Clear canvas
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
+  upload.addEventListener("change", function (e) {
+    const file = e.target.files[0];
+    if (!file) return;
 
-          // Optional: Add background color
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const reader = new FileReader();
+    reader.onload = function (event) {
+      const userImage = new Image();
+      userImage.onload = function () {
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-          // Draw circular cropped user image (manually adjust based on your design)
-          ctx.save();
-          ctx.beginPath();
-          ctx.arc(540, 540, 250, 0, Math.PI * 2, true); // Adjust based on actual position
-          ctx.closePath();
-          ctx.clip();
-          ctx.drawImage(userImage, 290, 290, 500, 500); // Position user image properly
-          ctx.restore();
+        // Draw white background (optional)
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-          // Draw poster frame over it
-          frameImage.onload = () => {
-            ctx.drawImage(frameImage, 0, 0, 1080, 1350);
-          };
-          ctx.drawImage(frameImage, 0, 0, 1080, 1350);
+        // Draw circular cropped image inside frame
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(circleX, circleY, circleRadius, 0, Math.PI * 2);
+        ctx.clip();
+
+        // Calculate crop so image fills circle without squashing
+        let srcX = 0, srcY = 0;
+        let srcSize = Math.min(userImage.width, userImage.height);
+        if (userImage.width > userImage.height) {
+          srcX = (userImage.width - userImage.height) / 2;
+        } else {
+          srcY = (userImage.height - userImage.width) / 2;
+        }
+
+        ctx.drawImage(userImage, srcX, srcY, srcSize, srcSize, circleX - circleRadius, circleY - circleRadius, circleRadius * 2, circleRadius * 2);
+        ctx.restore();
+
+        // Draw the poster frame on top
+        frameImage.onload = () => {
+          ctx.drawImage(frameImage, 0, 0, canvas.width, canvas.height);
         };
-        userImage.src = event.target.result;
+        ctx.drawImage(frameImage, 0, 0, canvas.width, canvas.height);
       };
-      reader.readAsDataURL(file);
-    });
+      userImage.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
 
-    downloadBtn.addEventListener("click", () => {
-      const link = document.createElement("a");
-      link.download = "my-event-poster.png";
-      link.href = canvas.toDataURL("image/png");
-      link.click();
-    });
-  </script>
-</body>
-</html>
+  downloadBtn.addEventListener("click", () => {
+    const link = document.createElement("a");
+    link.download = "my-event-poster.png";
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  });
+</script>
