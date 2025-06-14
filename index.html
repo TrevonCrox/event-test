@@ -11,10 +11,20 @@
       background: #f0f2f5;
       padding: 20px;
     }
+
+    h2 {
+      margin-bottom: 0.3em;
+    }
+
+    p {
+      color: #555;
+    }
+
     #canvasContainer {
       margin: 20px auto;
       max-width: 600px;
     }
+
     canvas {
       width: 100%;
       height: auto;
@@ -22,9 +32,11 @@
       border-radius: 20px;
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
     }
+
     input[type="file"] {
       margin-top: 10px;
     }
+
     button {
       margin-top: 15px;
       padding: 10px 20px;
@@ -38,76 +50,92 @@
   </style>
 </head>
 <body>
-  <h2>Upload Your Photo to Join the Event Poster!</h2>
-  <p>Your image will appear in the circular space on the event flyer automatically.</p>
+  <h2>Upload Your Photo to Join the Event Poster</h2>
+  <p>Your image will appear in the circular frame of the event poster automatically.</p>
   <input type="file" id="upload" accept="image/*">
   <div id="canvasContainer">
-    <canvas id="canvas" width="1080" height="1350"></canvas>
+    <canvas id="canvas"></canvas>
   </div>
   <button id="downloadBtn">Download Your Poster</button>
 
   <script>
-  const upload = document.getElementById("upload");
-  const canvas = document.getElementById("canvas");
-  const ctx = canvas.getContext("2d");
-  const downloadBtn = document.getElementById("downloadBtn");
+    const upload = document.getElementById("upload");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
 
-  const frameImage = new Image();
-  frameImage.src = "poster_frame.png"; // Your full-size poster with transparent circle
+    // ✅ Set exact size to match your poster PNG
+    canvas.width = 1080;
+    canvas.height = 1350;
 
-  // Position of the circular frame center (adjust to match your design)
-  const circleX = 540;  // X-center of circle
-  const circleY = 540;  // Y-center of circle
-  const circleRadius = 250; // Radius of circular frame
+    // ✅ Center coordinates and radius of the circular frame on your poster
+    const circleX = 540;         // X position of center
+    const circleY = 540;         // Y position of center
+    const circleRadius = 250;    // Half of 500px diameter
 
-  upload.addEventListener("change", function (e) {
-    const file = e.target.files[0];
-    if (!file) return;
+    const frameImage = new Image();
+    frameImage.src = "poster_frame.png"; // Your event poster image with a transparent circle
 
-    const reader = new FileReader();
-    reader.onload = function (event) {
-      const userImage = new Image();
-      userImage.onload = function () {
-        // Clear canvas
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    upload.addEventListener("change", function (e) {
+      const file = e.target.files[0];
+      if (!file) return;
 
-        // Draw white background (optional)
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const reader = new FileReader();
+      reader.onload = function (event) {
+        const userImage = new Image();
+        userImage.onload = function () {
+          // Clear previous drawing
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Draw circular cropped image inside frame
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(circleX, circleY, circleRadius, 0, Math.PI * 2);
-        ctx.clip();
+          // Optional: white background
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Calculate crop so image fills circle without squashing
-        let srcX = 0, srcY = 0;
-        let srcSize = Math.min(userImage.width, userImage.height);
-        if (userImage.width > userImage.height) {
-          srcX = (userImage.width - userImage.height) / 2;
-        } else {
-          srcY = (userImage.height - userImage.width) / 2;
-        }
+          // Draw circular crop of uploaded image
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(circleX, circleY, circleRadius, 0, Math.PI * 2);
+          ctx.clip();
 
-        ctx.drawImage(userImage, srcX, srcY, srcSize, srcSize, circleX - circleRadius, circleY - circleRadius, circleRadius * 2, circleRadius * 2);
-        ctx.restore();
+          // Crop square from uploaded image to fill circle properly
+          let srcX = 0, srcY = 0;
+          let srcSize = Math.min(userImage.width, userImage.height);
+          if (userImage.width > userImage.height) {
+            srcX = (userImage.width - userImage.height) / 2;
+          } else {
+            srcY = (userImage.height - userImage.width) / 2;
+          }
 
-        // Draw the poster frame on top
-        frameImage.onload = () => {
+          ctx.drawImage(
+            userImage,
+            srcX, srcY, srcSize, srcSize,
+            circleX - circleRadius,
+            circleY - circleRadius,
+            circleRadius * 2,
+            circleRadius * 2
+          );
+          ctx.restore();
+
+          // Draw poster frame over it
+          frameImage.onload = () => {
+            ctx.drawImage(frameImage, 0, 0, canvas.width, canvas.height);
+          };
           ctx.drawImage(frameImage, 0, 0, canvas.width, canvas.height);
         };
-        ctx.drawImage(frameImage, 0, 0, canvas.width, canvas.height);
-      };
-      userImage.src = event.target.result;
-    };
-    reader.readAsDataURL(file);
-  });
 
-  downloadBtn.addEventListener("click", () => {
-    const link = document.createElement("a");
-    link.download = "my-event-poster.png";
-    link.href = canvas.toDataURL("image/png");
-    link.click();
-  });
-</script>
+        userImage.src = event.target.result;
+      };
+
+      reader.readAsDataURL(file);
+    });
+
+    // Download image as PNG
+    const downloadBtn = document.getElementById("downloadBtn");
+    downloadBtn.addEventListener("click", () => {
+      const link = document.createElement("a");
+      link.download = "my-event-poster.png";
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    });
+  </script>
+</body>
+</html>
