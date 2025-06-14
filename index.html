@@ -1,141 +1,109 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Event Poster Frame Uploader</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DP Frame Generator</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
       text-align: center;
-      background: #f0f2f5;
-      padding: 20px;
-    }
-
-    h2 {
-      margin-bottom: 0.3em;
-    }
-
-    p {
-      color: #555;
-    }
-
-    #canvasContainer {
-      margin: 20px auto;
-      max-width: 600px;
-    }
-
-    canvas {
-      width: 100%;
-      height: auto;
-      border: 2px solid #ccc;
-      border-radius: 20px;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-    }
-
-    input[type="file"] {
-      margin-top: 10px;
-    }
-
-    button {
-      margin-top: 15px;
-      padding: 10px 20px;
-      font-size: 16px;
-      cursor: pointer;
-      background-color: #28a745;
+      background-color: #111;
       color: white;
-      border: none;
-      border-radius: 5px;
+      font-family: sans-serif;
+    }
+    canvas {
+      margin-top: 20px;
+      border: 1px solid #ccc;
     }
   </style>
 </head>
 <body>
-  <h2>Upload Your Photo to Join the Event Poster</h2>
-  <p>Your image will appear in the circular frame of the event poster automatically.</p>
-  <input type="file" id="upload" accept="image/*">
-  <div id="canvasContainer">
-    <canvas id="canvas"></canvas>
-  </div>
-  <button id="downloadBtn">Download Your Poster</button>
+  <h2>Upload Your Image</h2>
+  <input type="file" id="upload" accept="image/*" />
+  <br />
+  <canvas id="canvas" width="1080" height="1350"></canvas>
+  <br />
+  <a id="download" href="#" download="framed_dp.png">Download Image</a>
+
+  <!-- Load face-api.js -->
+  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
 
   <script>
-    const upload = document.getElementById("upload");
-    const canvas = document.getElementById("canvas");
-    const ctx = canvas.getContext("2d");
-
-    // ✅ Set exact size to match your poster PNG
-    canvas.width = 1080;
-    canvas.height = 1350;
-
-    // ✅ Center coordinates and radius of the circular frame on your poster
-    const circleX = 540;         // X position of center
-    const circleY = 540;         // Y position of center
-    const circleRadius = 250;    // Half of 500px diameter
-
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const upload = document.getElementById('upload');
+    const download = document.getElementById('download');
     const frameImage = new Image();
-    frameImage.src = "poster_frame.png"; // Your event poster image with a transparent circle
+    frameImage.src = 'poster_frame.png'; // Must match your GitHub image file name
 
-    upload.addEventListener("change", function (e) {
+    // Load face-api models
+    Promise.all([
+      faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js/models')
+    ]).then(() => console.log('FaceAPI loaded'));
+
+    upload.addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (!file) return;
+      const img = await createImageBitmap(file);
 
-      const reader = new FileReader();
-      reader.onload = function (event) {
-        const userImage = new Image();
-        userImage.onload = function () {
-          // Clear previous drawing
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // Create an offscreen canvas to analyze
+      const offCanvas = document.createElement('canvas');
+      offCanvas.width = img.width;
+      offCanvas.height = img.height;
+      const offCtx = offCanvas.getContext('2d');
+      offCtx.drawImage(img, 0, 0);
 
-          // Optional: white background
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // Detect face
+      const detections = await faceapi.detectSingleFace(offCanvas, new faceapi.TinyFaceDetectorOptions());
+      let sx = 0, sy = 0, sw = img.width, sh = img.height;
 
-          // Draw circular crop of uploaded image
-          ctx.save();
-          ctx.beginPath();
-          ctx.arc(circleX, circleY, circleRadius, 0, Math.PI * 2);
-          ctx.clip();
+      if (detections) {
+        const box = detections.box;
+        const faceCenterX = box.x + box.width / 2;
+        const faceCenterY = box.y + box.height / 2;
 
-          // Crop square from uploaded image to fill circle properly
-          let srcX = 0, srcY = 0;
-          let srcSize = Math.min(userImage.width, userImage.height);
-          if (userImage.width > userImage.height) {
-            srcX = (userImage.width - userImage.height) / 2;
-          } else {
-            srcY = (userImage.height - userImage.width) / 2;
-          }
+        // Try to zoom out slightly and center face
+        const cropSize = Math.max(box.width, box.height) * 3.2; // Zoom out a bit
+        sx = Math.max(0, faceCenterX - cropSize / 2);
+        sy = Math.max(0, faceCenterY - cropSize / 2);
+        sw = sh = cropSize;
 
-          ctx.drawImage(
-            userImage,
-            srcX, srcY, srcSize, srcSize,
-            circleX - circleRadius,
-            circleY - circleRadius,
-            circleRadius * 2,
-            circleRadius * 2
-          );
-          ctx.restore();
+        // Clamp to image dimensions
+        if (sx + sw > img.width) sx = img.width - sw;
+        if (sy + sh > img.height) sy = img.height - sh;
+        sx = Math.max(0, sx);
+        sy = Math.max(0, sy);
+      }
 
-          // Draw poster frame over it
-          frameImage.onload = () => {
-            ctx.drawImage(frameImage, 0, 0, canvas.width, canvas.height);
-          };
-          ctx.drawImage(frameImage, 0, 0, canvas.width, canvas.height);
-        };
+      // Clear and draw background white
+      ctx.fillStyle = "white";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        userImage.src = event.target.result;
+      // Draw user image inside the center circle region (approx)
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(540, 540, 250, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+      ctx.drawImage(img, sx, sy, sw, sh, 290, 290, 500, 500); // Draw centered image
+      ctx.restore();
+
+      // Draw the golden frame on top
+      frameImage.onload = () => {
+        ctx.drawImage(frameImage, 0, 0, 1080, 1350);
+        updateDownload();
       };
 
-      reader.readAsDataURL(file);
+      // If already loaded
+      if (frameImage.complete) {
+        ctx.drawImage(frameImage, 0, 0, 1080, 1350);
+        updateDownload();
+      }
     });
 
-    // Download image as PNG
-    const downloadBtn = document.getElementById("downloadBtn");
-    downloadBtn.addEventListener("click", () => {
-      const link = document.createElement("a");
-      link.download = "my-event-poster.png";
-      link.href = canvas.toDataURL("image/png");
-      link.click();
-    });
+    function updateDownload() {
+      download.href = canvas.toDataURL();
+    }
   </script>
 </body>
 </html>
