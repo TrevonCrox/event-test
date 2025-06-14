@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Event Poster Frame Uploader</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #f0f2f5;
+      padding: 20px;
+    }
+    #canvasContainer {
+      margin: 20px auto;
+      max-width: 600px;
+    }
+    canvas {
+      width: 100%;
+      height: auto;
+      border: 2px solid #ccc;
+      border-radius: 20px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+    input[type="file"] {
+      margin-top: 10px;
+    }
+    button {
+      margin-top: 15px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      background-color: #28a745;
+      color: white;
+      border: none;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Upload Your Photo to Join the Event Poster!</h2>
+  <p>Your image will appear in the circular space on the event flyer automatically.</p>
+  <input type="file" id="upload" accept="image/*">
+  <div id="canvasContainer">
+    <canvas id="canvas" width="1080" height="1350"></canvas>
+  </div>
+  <button id="downloadBtn">Download Your Poster</button>
+
+  <script>
+    const upload = document.getElementById("upload");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const downloadBtn = document.getElementById("downloadBtn");
+
+    const frameImage = new Image();
+    frameImage.src = "poster_frame.png"; // Your designed poster with transparent circular area
+
+    upload.addEventListener("change", function (e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+
+      reader.onload = function (event) {
+        const userImage = new Image();
+        userImage.onload = function () {
+          // Clear canvas
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          // Optional: Add background color
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          // Draw circular cropped user image (manually adjust based on your design)
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(540, 540, 250, 0, Math.PI * 2, true); // Adjust based on actual position
+          ctx.closePath();
+          ctx.clip();
+          ctx.drawImage(userImage, 290, 290, 500, 500); // Position user image properly
+          ctx.restore();
+
+          // Draw poster frame over it
+          frameImage.onload = () => {
+            ctx.drawImage(frameImage, 0, 0, 1080, 1350);
+          };
+          ctx.drawImage(frameImage, 0, 0, 1080, 1350);
+        };
+        userImage.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    downloadBtn.addEventListener("click", () => {
+      const link = document.createElement("a");
+      link.download = "my-event-poster.png";
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    });
+  </script>
+</body>
+</html>
